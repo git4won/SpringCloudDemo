@@ -24,7 +24,7 @@ Spring Boot 2.1.8.RELEASE
  ![NewModule-eureka](./res/NewModule-eureka.png)
 4. Next - 选择组件 Spring CLoud Discovery - Eureka Server
 5. Next - 填写 Module name 和指定模块的存储位置
-6. **在 Application 前加上 @EnableEurekaServer 注解**
+6. **在 Application 前加上 @EnableEurekaServer 注解，开启 Eureka Server 功能**
 7. 在 resources 目录下的 application.properties 中添加一些基础的属性，服务名，端口等，如：
 
 	```
@@ -39,3 +39,94 @@ Spring Boot 2.1.8.RELEASE
 
 运行效果：
  ![eureka-run](./res/eureka-run.png)
+
+
+## 创建一个简单的 RESTful 服务：SimpleService
+
+作为一个 Eureka Client 以及实际业务模块。
+
+创建的操作步骤参考 Eureka 的创建，对应修改：
+ - 选择组件 Web - Spring Web
+ - 选择组件 Spring Cloud Discovery - Eureka Discovery Client
+ - 编写一个简单的接口，如：
+
+	```
+	@RestController
+	public class HelloController {
+	    @RequestMapping(value = {"/hello"}, method = RequestMethod.GET)
+	    public String hello() {
+	        return "Hello!";
+	    }
+	}
+	```
+
+ - 在 resources 目录下的 application.properties 中添加一些基础的属性，服务名，端口等，如：
+
+	```
+	server.port=10242
+	spring.application.name=SimpleService
+	eureka.client.service-url.defaultZone=http://127.0.0.1:10240/eureka
+	eureka.instance.hostname=simple-service
+	```
+
+ - 运行
+
+
+如图，SimpleService 已经加入 Eureka 注册中心：
+	![SimpleService](./res/SimpleService.png)
+
+ - 接口访问测试
+
+	```
+	$ curl -s 127.0.0.1:10242/hello
+	Hello!
+	```
+
+
+## 创建网关模块：Zuul
+
+创建的操作步骤参考 Eureka 的创建，对应修改：
+
+ - 选择组件 Spring Cloud Routing - Zuul
+ - **在 Application 前加上 @EnableZuulProxy 注解**
+ - 加入 eureka-client 依赖，让服务注册到注册中心：
+
+	```
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+			</dependency>
+	```
+
+ - 在 resources 目录下的 application.properties 中添加一些基础的属性，服务名，端口等，如：
+
+	```
+	server.port=10241
+	spring.application.name=demo-gateway-zuul
+
+	eureka.client.service-url.defaultZone=http://127.0.0.1:10240/eureka
+	eureka.instance.hostname=demo-gateway-zuul
+
+	# 所有api接口加上 /v1 作为版本号
+	zuul.prefix=/v1
+
+	# routes to url
+	zuul.routes.url1.path=/hello/**
+	zuul.routes.url1.url=http://localhost:10242/hello/
+	```
+
+- 启动工程，会在控制台输出如下打印：
+
+	```
+	com.netflix.discovery.DiscoveryClient    : DiscoveryClient_DEMO-GATEWAY-ZUUL/localhost:demo-gateway-zuul:10241 - registration status: 204
+	```
+
+在浏览器打开注册中心：http://127.0.0.1:10240/ ，可以看到网关 zuul 已经注册成功。
+	![zuul-run](./res/zuul-run.png)
+
+通过网关访问 SimpleService 服务：
+
+	```
+	$ curl -s 127.0.0.1:10241/v1/hello
+	Hello!
+	```
